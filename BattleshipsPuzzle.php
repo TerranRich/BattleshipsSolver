@@ -1,3 +1,5 @@
+<?php
+
 class BattleshipsPuzzle {
 
   /**
@@ -190,16 +192,51 @@ class BattleshipsPuzzle {
       $changed = $previousGrid !== $currentGrid;
     } while ($changed && !$this->isSolved());
 
+    // Final check to resolve any remaining unresolved cells.
+    $this->resolveUnknownSegments();
+
     // If the puzzle hasn't been solved after no changes are possible above, try
     // trial and error through backtracking.
     if ($this->isSolved()) {
       return true;
     }
 
-    // TODO: BACKTRACKING TRIAL & ERROR
+    // Backtracking trial-and-error.
+    return $this->backtrackSolve();
+  }
 
-    // No solution can be found at this point.
-    return false;
+  /**
+   * Attempt to solve the puzzle using backtracking.
+   *
+   * @return boolean Whether the puzzle has been solved or not
+   */
+  private function backtrackSolve() {
+    $segments = [
+      self::CELL_SINGLE,
+      self::CELL_LEFT,
+      self::CELL_TOP,
+    ];
+    for ($row = 0; $row < $this->size; $row++) {
+      for ($col = 0; $col < $this->size; $col++) {
+        if ($this->isBlank($row, $col)) {
+          // Try placing a ship segment here.
+          foreach ($segments as $segment) {
+            if ($this->canPlaceSegmentInCell($row, $col, true)) {
+              $this->setCellValue($row, $col, $segment);
+              if ($this->solve()) {
+                return true;
+              }
+              // Backtrack if placing this segment didn't lead to a solution.
+              $this->setCellValue($row, $col, self::CELL_BLANK);
+            }
+          }
+          // If no segment placement works, return false.
+          return false;
+        }
+      }
+    }
+    // If no blank cells are left, the puzzle is solved.
+    return $this->isSolved();
   }
 
   /**
@@ -511,7 +548,7 @@ class BattleshipsPuzzle {
           fn($row) => $row[$col] !== self::CELL_WATER
         ));
         // Check to see if all blank cells CAN be filled in with ship segments.
-        if ($numFillableCells === $count - $numFilledCells) {
+        if ($numFillableCells === $count) {
           // Fill in blank cells with unknown ship segments.
           for ($row = 0; $row < $this->size; $row++) {
             $this->markCellIfBlank($row, $col, self::CELL_UNKNOWN);
@@ -1219,6 +1256,35 @@ class BattleshipsPuzzle {
       // If this cell is filled with segment, this placement isn't allowed.
       if ($this->isAnyShipSegment($nextRow, $nextCol)) {
         return false;
+      }
+
+      // Additional check for invalid adjacent placements.
+      $adjacents = self::DIRECTIONS_CARDINAL;
+      foreach ($adjacents as $direction) {
+        list($deltaCol, $deltaRow) = $direction;
+        $adjRow = $row + $deltaRow;
+        $adjCol = $row + $deltaCol;
+        $adjValue = $this->getCellValue($adjRow, $adjCol);
+        if ($adjValue === false) continue;
+
+        // Check for invalid adjacent placements.
+        if ($this->isValueKnownShipSegment($adjValue)) {
+          if ($cellValue === self::CELL_SINGLE || $adjValue === self::CELL_SINGLE) {
+            // A single ship segment cannot be next to any other segment.
+            return false;
+          }
+          if ($this->isValueAnyEnd($cellValue) || $this->isValueAnyEnd($adjValue)) {
+            // Allow opposite adjacent endpieces if they form valid 2-cell ship.
+            if (!(
+              ($cellValue === self::CELL_TOP && $adjValue === self::CELL_BOTTOM) ||
+              ($cellValue === self::CELL_BOTTOM && $adjValue === self::CELL_TOP) ||
+              ($cellValue === self::CELL_LEFT && $adjValue === self::CELL_RIGHT) ||
+              ($cellValue === self::CELL_RIGHT && $adjValue === self::CELL_LEFT)
+            )) {
+              return false;
+            }
+          }
+        }
       }
     }
 
