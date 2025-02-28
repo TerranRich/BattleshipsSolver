@@ -1007,7 +1007,7 @@ class BattleshipsPuzzle {
     $colMult = $isHorizontal ? 1 : 0;
 
     // Check each cell along the path.
-    for ($i = 0; $i < $length; $i++) {
+    for ($i = 1; $i <= $length; $i++) {
       $shipLength = $i; // keep track
       $thisRow = $startRow + ($rowMult * $shipLength);
       $thisCol = $startCol + ($colMult * $shipLength);
